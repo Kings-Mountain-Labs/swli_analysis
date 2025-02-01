@@ -6,7 +6,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "accelerate>=1.2.1",
-    "cupy-cuda12x>=13.3.0",
+    "ipykernel>=6.29.5",
+    # "cupy-cuda12x>=13.3.0",
     "matplotlib>=3.10.0",
     "numpy>=2.2.2",
     "opencv-python>=4.11.0.86",
@@ -26,9 +27,11 @@ dependencies = [
 [tool.uv.sources]
 torch = [
   { index = "pytorch-cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
 ]
 torchvision = [
   { index = "pytorch-cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
 ]
 
 [[tool.uv.index]]
@@ -36,3 +39,7 @@ name = "pytorch-cu124"
 url = "https://download.pytorch.org/whl/cu124"
 explicit = true
 
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

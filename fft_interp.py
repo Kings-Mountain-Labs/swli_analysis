@@ -3,7 +3,6 @@ import cv2
 import plotly.express as px
 from scipy.signal import hilbert, butter, filtfilt
 import pywt
-import cupy as cp 
 # from pytorch_wavelets import DWT1DForward, DWT1DInverse
 import torch
 
@@ -15,9 +14,8 @@ FPS = 30
 video_path = "videos\\rawglasssmall.avi"
 
 
-def analyze_video(video_path: str, method: str, scan_speed: float, fps: int):
+def get_frames(video_path: str) -> np.ndarray:
     cap = cv2.VideoCapture(video_path)
-    microns_per_frame = scan_speed * 1 / fps
 
     frames = []
     while cap.isOpened():
@@ -32,6 +30,13 @@ def analyze_video(video_path: str, method: str, scan_speed: float, fps: int):
     frames = frames - average_pixel_intensity
     # normalize the frames
     # frames = frames / np.max(frames) # this takes hella long
+    return frames
+
+def analyze_video(video_path: str, method: str, scan_speed: float, fps: int):
+    microns_per_frame = scan_speed * 1 / fps
+    
+
+    frames = get_frames(video_path)
     # Convert height map to microns
     if method == "hilbert":
         height_map = hilbert_transform(frames) * microns_per_frame

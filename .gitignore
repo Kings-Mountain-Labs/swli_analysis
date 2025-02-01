@@ -174,3 +174,4 @@ cython_debug/
 videos/*.avi
 profile.json
 profile.html
+.DS_store
