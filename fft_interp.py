@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.signal import hilbert
 import pywt
 import cupy as cp
-from pytorch_wavelets import DWT1DForward, DWT1DInverse
+# from pytorch_wavelets import DWT1DForward, DWT1DInverse
 import torch
 
 SCAN_SPEED = 0.25  # Microns per second
@@ -54,8 +54,9 @@ def hilbert_transform(frames):
 
 def cwt(frames):
     height_map = np.zeros(frames.shape[1:])
-    for x in range(frames.shape[0]):
-        for y in range(frames.shape[1]):
+    for x in range(frames.shape[1]):
+        for y in range(frames.shape[2]):
+            print(f"Processing pixel {x}, {y} of {frames.shape[1:]}")
             intensity_profile = frames[:, x, y]  # Extract pixel intensity over time
             peak_pos = find_peak_cwt(intensity_profile)
             height_map[x, y] = peak_pos  # Store detected peak as height value
@@ -69,6 +70,7 @@ def find_peak_cwt(signal, wavelet='morl', scales=np.arange(1, 50)):
     return peak_idx
 
 def cwt_gpu(frames, wavelet='db1', level=1, device='cuda'):
+    # this is what chatgpt thinks and I havent attempted to make this correct yet
     device = torch.device(device if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     T, H, W = frames.shape
@@ -121,6 +123,6 @@ def plot_height_map(height_map):
     plt.show()
 
 if __name__ == "__main__":
-    height_map = analyze_video(video_path, method="cwt_gpu", scan_speed=SCAN_SPEED, fps=FPS)
+    height_map = analyze_video(video_path, method="hilbert", scan_speed=SCAN_SPEED, fps=FPS)
     plot_height_map(height_map)
 
