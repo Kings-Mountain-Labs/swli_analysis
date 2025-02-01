@@ -28,6 +28,10 @@ def analyze_video(video_path: str, method: str, scan_speed: float, fps: int):
         frames.append(gray_frame)
     cap.release()
     frames = np.array(frames)  # Stack as 3D array (frames, height, width)
+    average_pixel_intensity = np.mean(frames, axis=0)
+    frames = frames - average_pixel_intensity
+    # normalize the frames
+    # frames = frames / np.max(frames) # this takes hella long
     # Convert height map to microns
     if method == "hilbert":
         height_map = hilbert_transform(frames) * microns_per_frame
@@ -43,14 +47,13 @@ def analyze_video(video_path: str, method: str, scan_speed: float, fps: int):
 
 def hilbert_transform(frames):
     # Process each pixel through Hilbert transform to extract modulation envelope
+    # you could use numpy straight without the for loops but you need many gigs of ram (like 90 or something) and it would be slower
     height_map = np.zeros(frames.shape[1:])
     b, a = butter(2, 0.01, btype='lowpass')
 
     for x in range(frames.shape[1]):
         for y in range(frames.shape[2]):
             intensity_profile = frames[:, x, y]
-            average_intensity = np.mean(intensity_profile)
-            intensity_profile = intensity_profile - average_intensity
             analytic_signal = hilbert(intensity_profile)
             envelope = np.abs(analytic_signal)
             filtered_envelope = filtfilt(b, a, envelope)
@@ -70,8 +73,8 @@ def hilbert_gpu(frames) -> np.ndarray:
     hilbert_ed = hilbert_transform_1d_torch(frames, axis=0)
     hilbert_ed = hilbert_ed.cpu().numpy()
     # plot for one pixel to debug
-    fig = px.line(x=range(hilbert_ed.shape[0]), y=hilbert_ed[:, 0, 0])
-    fig.add_scatter(x=range(frames.shape[0]), y=frames[:, 0, 0])
+    fig = px.line(y=hilbert_ed[:, 0, 0])
+    fig.add_scatter(y=frames[:, 0, 0])
     fig.show()
     return np.argmax(hilbert_ed, axis=0)
 
@@ -169,8 +172,9 @@ def plot_height_map(height_map, ldr=True):
     if ldr:
         # calculate the 2 sigma range of the height map and limit the color bar to that range
         two_sigma = np.std(height_map) * 2
-        vmin = np.mean(height_map) - two_sigma
-        vmax = np.mean(height_map) + two_sigma
+        average_height = np.mean(height_map)
+        vmin = average_height - two_sigma
+        vmax = average_height + two_sigma
         print(f"vmin: {vmin}, vmax: {vmax} for height map")
 
     fig = px.imshow(height_map, color_continuous_scale="viridis", zmin=vmin, zmax=vmax, labels={"colorbar": "Height (microns)"})
