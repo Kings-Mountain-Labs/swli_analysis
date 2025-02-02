@@ -9,6 +9,7 @@ dependencies = [
     "ipykernel>=6.29.5",
     # "cupy-cuda12x>=13.3.0",
     "matplotlib>=3.10.0",
+    "nbformat>=5.10.4",
     "numpy>=2.2.2",
     "opencv-python>=4.11.0.86",
     "pandas>=2.2.3",
@@ -30,6 +31,10 @@ torch = [
   { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
 ]
 torchvision = [
+  { index = "pytorch-cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
+]
+torchaudio = [
   { index = "pytorch-cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
   { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
 ]
