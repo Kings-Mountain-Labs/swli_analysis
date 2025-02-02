@@ -20,6 +20,8 @@ dependencies = [
     "scalene>=1.5.51",
     "scipy>=1.15.1",
     "torch>=2.5.1",
+    "torchaudio>=2.0.0",
+    "torchvision>=0.15.0",
     "transformers>=4.47.1",
 ]
 
