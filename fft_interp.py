@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import plotly.express as px
-from scipy.signal import hilbert, butter, filtfilt
+from scipy.signal import hilbert, butter, filtfilt, sosfiltfilt, find_peaks_cwt
 import pywt
 # from pytorch_wavelets import DWT1DForward, DWT1DInverse
 import torch
@@ -11,7 +11,7 @@ FPS = 30
 
 
 # Load video
-video_path = "videos\\rawglasssmall.avi"
+video_path = "videos/rawglasssmall.avi"
 
 
 def get_frames(video_path: str) -> np.ndarray:
@@ -29,7 +29,7 @@ def get_frames(video_path: str) -> np.ndarray:
     average_pixel_intensity = np.mean(frames, axis=0)
     frames = frames - average_pixel_intensity
     # normalize the frames
-    # frames = frames / np.max(frames) # this takes hella long
+    frames = frames / np.max(frames) # this takes hella long
     return frames
 
 def analyze_video(video_path: str, method: str, scan_speed: float, fps: int):
@@ -54,14 +54,14 @@ def hilbert_transform(frames):
     # Process each pixel through Hilbert transform to extract modulation envelope
     # you could use numpy straight without the for loops but you need many gigs of ram (like 90 or something) and it would be slower
     height_map = np.zeros(frames.shape[1:])
-    b, a = butter(2, 0.01, btype='lowpass')
+    sos = butter(2, 0.01, btype='lowpass', output='sos')
 
     for x in range(frames.shape[1]):
         for y in range(frames.shape[2]):
             intensity_profile = frames[:, x, y]
             analytic_signal = hilbert(intensity_profile)
             envelope = np.abs(analytic_signal)
-            filtered_envelope = filtfilt(b, a, envelope)
+            filtered_envelope = sosfiltfilt(sos, envelope)
             # height_map[x, y] = np.argmax(envelope)  # Peak corresponds to height
             height_map[x, y] = np.argmax(filtered_envelope)
             if x == 0 and y == 0 and False:
@@ -74,17 +74,25 @@ def hilbert_transform(frames):
 
     return height_map
 
-def hilbert_gpu(frames) -> np.ndarray:
-    hilbert_ed = hilbert_transform_1d_torch(frames, axis=0)
+def hilbert_gpu(frames, device="cpu") -> np.ndarray:
+    gpu_frames = torch.tensor(frames, dtype=torch.float32)
+    gpu_frames = gpu_frames.to(device)
+    # this hella needs to be batched instead of just sending the tensor
+    hilbert_ed = hilbert_transform_1d_torch(gpu_frames, axis=0)
     hilbert_ed = hilbert_ed.cpu().numpy()
     # plot for one pixel to debug
-    fig = px.line(y=hilbert_ed[:, 0, 0])
-    fig.add_scatter(y=frames[:, 0, 0])
-    fig.show()
-    return np.argmax(hilbert_ed, axis=0)
+
+    hilbert_ed = np.abs(hilbert_ed)
+
+    sos = butter(2, 0.01, btype='lowpass', output='sos')
+
+    # this next bit should be done on a GPU
+    filtered_envelope = sosfiltfilt(sos, hilbert_ed, axis=0)
+    height_map = np.argmax(filtered_envelope, axis=0)
+    return height_map
 
 
-def hilbert_transform_1d_torch(data_np: np.ndarray, axis: int = -1) -> torch.Tensor:
+def hilbert_transform_1d_torch(data_torch, axis: int = -1) -> torch.Tensor:
     """
     Compute the 1D Hilbert transform of a 3D real array along the specified axis
     using PyTorch's FFT operations.
@@ -106,7 +114,7 @@ def hilbert_transform_1d_torch(data_np: np.ndarray, axis: int = -1) -> torch.Ten
 
     # Convert the NumPy array to a PyTorch tensor (float or double)
     # We'll assume float32 here; adjust as needed
-    data_torch = torch.from_numpy(data_np).to(torch.float32)
+    # data_torch = torch.from_numpy(data_np).to(torch.float32)
 
     # FFT along the chosen axis
     data_fft = torch.fft.fft(data_torch, dim=axis)
@@ -149,10 +157,7 @@ def hilbert_transform_1d_torch(data_np: np.ndarray, axis: int = -1) -> torch.Ten
     # corresponds to the Hilbert transform of the original data.
     data_ifft = torch.fft.ifft(data_fft_filtered, dim=axis)
 
-    # The Hilbert transform is the imaginary part
-    hilbert_torch = data_ifft.imag
-
-    return hilbert_torch
+    return data_ifft
 
 def cwt(frames):
     height_map = np.zeros(frames.shape[1:])
@@ -160,17 +165,18 @@ def cwt(frames):
         for y in range(frames.shape[2]):
             print(f"Processing pixel {x}, {y} of {frames.shape[1:]}")
             intensity_profile = frames[:, x, y]  # Extract pixel intensity over time
-            peak_pos = find_peak_cwt(intensity_profile)
-            height_map[x, y] = peak_pos  # Store detected peak as height value
+            analytic_signal = hilbert(intensity_profile)
+            envelope = np.abs(analytic_signal)
+            peak_pos = find_peaks_cwt(envelope, 600)
+            height_map[x, y] = peak_pos[0]  # Store detected peak as height value
+            if x == 0 and y == 0 and True:
+                print(f"peak_pos: {peak_pos}")
+                fig = px.line(y=intensity_profile)
+                fig.add_scatter(y=envelope)
+                fig.add_scatter(x=peak_pos, y=np.zeros(len(peak_pos)))
+                fig.show()
+                exit()
     return height_map
-
-def find_peak_cwt(signal, wavelet='morl', scales=np.arange(1, 50)):
-    """Apply Continuous Wavelet Transform (CWT) and find peak in wavelet response."""
-    coefficients, _ = pywt.cwt(signal, scales, wavelet)
-    modulus = np.abs(coefficients)
-    peak_idx = np.argmax(modulus.sum(axis=0))  # Sum across scales & find max
-    return peak_idx
-
 
 
 def plot_height_map(height_map, ldr=True):
@@ -187,6 +193,6 @@ def plot_height_map(height_map, ldr=True):
     fig.show()
 
 if __name__ == "__main__":
-    height_map = analyze_video(video_path, method="hilbert", scan_speed=SCAN_SPEED, fps=FPS)
+    height_map = analyze_video(video_path, method="cwt", scan_speed=SCAN_SPEED, fps=FPS)
     plot_height_map(height_map)
 
