@@ -16,7 +16,7 @@ video_path = "videos/rawglasssmall.avi"
 
 
 def get_device():
-    # check if cuda or mpl is available
+    # check if cuda or mps is available
     if torch.cuda.is_available() and torch.backends.cuda.is_built():
         print("cuda is available")
         device = torch.device("cuda")
@@ -49,6 +49,7 @@ def get_frames(filepath: str, greyscale=True) -> np.ndarray:
             frames[i] = frame
     
     cap.release()
+    print("Read in frames")
     average_pixel_intensity = np.mean(frames, axis=0)
     frames = frames - average_pixel_intensity
     # normalize the frames
@@ -126,7 +127,6 @@ def hilbert_gpu(frames) -> np.ndarray:
 
     # this next bit should be done on a GPU
     filtered_envelope = sosfiltfilt(sos, hilbert_ed, axis=0)
-    # filtered_envelope = savgol_filter(hilbert_ed, window_length=151, polyorder=3, axis=0)
     height_map = np.argmax(filtered_envelope, axis=0)
     x, y = 400, 400
     # gaussian = gaussian_filter1d(hilbert_ed[:, x, y], sigma=5)
@@ -163,7 +163,7 @@ def batch_hilbert_transform(frames: torch.Tensor, batch_size: int = 1000) -> tor
     for i in range(0, frames_reshaped.shape[0], batch_size):
         batch = frames_reshaped[i:i+batch_size]
         transformed = hilbert_transform(batch, axis=1)
-        result.append(transformed)
+        result.append(transformed.cpu())
     
     # Combine batches and reshape back to original dimensions
     transformed_frames = torch.cat(result, dim=0)
@@ -289,7 +289,7 @@ if __name__ == "__main__":
     print(f"Time to split rgb: {time.time() - start_time}")
     
     start_time = time.time()
-    red_height_map = analyze_video(red, method="hilbert", scan_speed=SCAN_SPEED, fps=FPS)
+    red_height_map = analyze_video(red, method="hilbert_gpu", scan_speed=SCAN_SPEED, fps=FPS)
     print(f"Time to analyze red: {time.time() - start_time}")
 
     # start_time = time.time()
