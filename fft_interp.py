@@ -6,6 +6,7 @@ from scipy.signal import hilbert, butter, filtfilt, sosfiltfilt, find_peaks_cwt,
 from scipy.ndimage import gaussian_filter1d
 import torch
 import time
+import pywt
 
 SCAN_SPEED = 0.25  # Microns per second
 FPS = 30
@@ -76,7 +77,7 @@ def refine_peak(envelope, initial_peak, window=101):
     x_vals = np.arange(initial_peak - window, initial_peak + window + 1)
     y_vals = envelope[initial_peak - window:initial_peak + window + 1]
     if len(x_vals) != len(y_vals):
-        # print(f"x_vals and y_vals must have the same length but are {len(x_vals)} and {len(y_vals)}")
+        # print(f"x_vals and y_vals must have the same length but are {len(x_vals)} and {len(y_vals)} {initial_peak - window} {initial_peak + window + 1} {x_vals} {y_vals}")
         return initial_peak
     # Fit a quadratic function: y = ax^2 + bx + c
     coeffs = np.polyfit(x_vals, y_vals, 2)
@@ -232,21 +233,31 @@ class HilbertTransform1D(torch.nn.Module):
 
 def cwt(frames):
     height_map = np.zeros(frames.shape[1:])
+
     for x in range(frames.shape[1]):
+        print(f"Processing pixel {x} of {frames.shape[1]}")
         for y in range(frames.shape[2]):
-            print(f"Processing pixel {x}, {y} of {frames.shape[1:]}")
-            intensity_profile = frames[:, x, y]  # Extract pixel intensity over time
-            analytic_signal = hilbert(intensity_profile)
-            envelope = np.abs(analytic_signal)
-            peak_pos = find_peaks_cwt(envelope, 600)
-            height_map[x, y] = peak_pos[0]  # Store detected peak as height value
+            intensity_profile = frames[:, x, y]
+            wavelet = pywt.ContinuousWavelet("cmor2.5-1.5")
+            # scales = np.geomspace(20, 50, num=10)
+            scales = 35
+            sampling_frequency = 30
+            sampling_period = 1/sampling_frequency
+            coeffs, frequency = pywt.cwt(intensity_profile, scales, wavelet, sampling_period)
+            magnitude = np.abs(coeffs)[0, :]
+            # print(f"magnitude: {magnitude.shape}")
+            # initial_peak = np.unravel_index(np.argmax(magnitude, axis=None), magnitude.shape)
+            initial_peak = np.argmax(magnitude)
+            # print(magnitude.shape)
+            # print(f"peak: {initial_peak}")
+            height_map[x, y] = refine_peak(magnitude, initial_peak, window=39)
             if x == 0 and y == 0 and True:
-                print(f"peak_pos: {peak_pos}")
-                fig = px.line(y=intensity_profile)
-                fig.add_scatter(y=envelope)
-                fig.add_scatter(x=peak_pos, y=np.zeros(len(peak_pos)))
+                fig = go.Figure()
+                fig.add_scatter(y=intensity_profile)
+                fig.add_scatter(y=magnitude)
+                fig.add_scatter(x=[height_map[x, y]], y=[0])
+                fig.add_scatter(x=[initial_peak], y=[0])
                 fig.show()
-                exit()
     return height_map
 
 
@@ -289,7 +300,7 @@ if __name__ == "__main__":
     print(f"Time to split rgb: {time.time() - start_time}")
     
     start_time = time.time()
-    red_height_map = analyze_video(red, method="hilbert_gpu", scan_speed=SCAN_SPEED, fps=FPS)
+    red_height_map = analyze_video(red, method="cwt", scan_speed=SCAN_SPEED, fps=FPS)
     print(f"Time to analyze red: {time.time() - start_time}")
 
     # start_time = time.time()
