@@ -250,7 +250,7 @@ def cwt(frames):
             initial_peak = np.argmax(magnitude)
             # print(magnitude.shape)
             # print(f"peak: {initial_peak}")
-            height_map[x, y] = refine_peak(magnitude, initial_peak, window=39)
+            height_map[x, y] = refine_peak(magnitude, initial_peak, window=159)
             if x == 0 and y == 0 and True:
                 fig = go.Figure()
                 fig.add_scatter(y=intensity_profile)
