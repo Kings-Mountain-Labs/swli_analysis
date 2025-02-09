@@ -3,7 +3,7 @@ import cv2
 import plotly.express as px
 import plotly.graph_objects as go
 from scipy.signal import hilbert, butter, filtfilt, sosfiltfilt, find_peaks_cwt, savgol_filter
-from scipy.ndimage import gaussian_filter1d
+from scipy.ndimage import gaussian_filter1d, gaussian_filter
 import torch
 import time
 import pywt
@@ -260,6 +260,10 @@ def cwt(frames):
                 fig.show()
     return height_map
 
+def gaussian_blur(height_map, sigma=2, radius=1):
+    # blur the height map with a gaussian kernel 1 pixel in each direction
+    blurred_height_map = gaussian_filter(height_map, sigma=sigma, radius=radius)
+    return blurred_height_map
 
 def plot_heat_map(height_map, extra_title="", ldr=True):
     if ldr:
@@ -282,6 +286,15 @@ def plot_height_map(height_map, extra_title=""):
     fig.update_layout(title=f"Reconstructed Height Map {extra_title}")
     fig.show()
 
+def remove_zeros(height_map):
+    # remove all zero values from the height map
+    height_map[height_map == 0] = np.nan
+    return height_map
+
+def remove_maxes(height_map):
+    # remove all zero values from the height map
+    height_map[height_map == np.max(height_map)] = np.nan
+    return height_map
 
 def split_rgb(frames):
     red = frames[:, :, :, 2]
@@ -311,9 +324,11 @@ if __name__ == "__main__":
     # green_height_map = analyze_video(green, method="hilbert_gpu", scan_speed=SCAN_SPEED, fps=FPS)
     # print(f"Time to analyze green: {time.time() - start_time}")
 
-    
+
+    red_height_map = remove_maxes(remove_zeros(red_height_map))
     plot_height_map(red_height_map, extra_title="Red")
     plot_heat_map(red_height_map, extra_title="Red")
+
     # plot_height_map(blue_height_map, extra_title="Blue")
     # plot_height_map(green_height_map, extra_title="Green")
 
